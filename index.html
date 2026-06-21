@@ -3,480 +3,684 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>RoadAlert | EGORKIN DEV</title>
-  <meta name="author" content="EGORKIN DEV">
+  <title>RoadAlert</title>
   <meta name="theme-color" content="#0B0C10">
-  <meta name="description" content="Сообщество дорожных событий">
-  <link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22RoadAlert%22%2C%22short_name%22%3A%22RoadAlert%22%2C%22start_url%22%3A%22.%2F%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%230B0C10%22%2C%22theme_color%22%3A%22%231A5FFF%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%20100%20100'%3E%3Ccircle%20cx%3D'50'%20cy%3D'50'%20r%3D'45'%20fill%3D'%231A5FFF'%2F%3E%3C%2Fsvg%3E%22%2C%22sizes%22%3A%22100x100%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%7D%5D%7D">
-  
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <!-- Firebase compat -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+  <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
   <style>
-    :root {
-      --bg: #050608;
-      --glass-bg: rgba(20, 25, 35, 0.65);
-      --glass-border: rgba(255, 255, 255, 0.08);
-      --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-      --blur: blur(24px);
-      --primary: #1A5FFF;
-      --danger: #FF2A4D;
-      --text: #ffffff;
-      --text-secondary: rgba(255, 255, 255, 0.6);
-      --radius-sm: 16px;
-      --radius-md: 24px;
-      --radius-lg: 32px;
-      --transition: 0.3s cubic-bezier(0.2, 0, 0, 1);
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
     }
 
-    * { margin:0; padding:0; box-sizing:border-box; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
-    body { background: var(--bg); color: var(--text); overflow: hidden; overscroll-behavior: none; -webkit-font-smoothing: antialiased; }
-    #app { width: 100vw; height: 100vh; position: relative; }
-    #map { position: absolute; top: 0; left: 0; right: 0; bottom: 0; z-index: 1; background: #050608; }
-    .leaflet-control-attribution { display: none !important; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #050608;
+      color: #fff;
+      overflow: hidden;
+      height: 100vh;
+    }
 
-    .ui-layer {
-      position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none;
-      display: flex; flex-direction: column; justify-content: space-between;
-      padding: env(safe-area-inset-top, 16px) 16px env(safe-area-inset-bottom, 24px) 16px;
+    #map {
+      width: 100%;
+      height: 100%;
     }
-    .interactive { pointer-events: auto; }
-    .glass {
-      background: var(--glass-bg); backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
-      border: 1px solid var(--glass-border); box-shadow: var(--glass-shadow);
+
+    .ui-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 1000;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 16px;
     }
-    .top-bar { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
-    .location-pill {
-      flex: 1; height: 48px; border-radius: 100px; display: flex; align-items: center;
-      padding: 0 16px; font-size: 15px; font-weight: 500;
+
+    .interactive {
+      pointer-events: auto;
     }
-    .location-pill span { color: var(--primary); margin-left: 6px; }
+
+    .top-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .location-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .pill {
+      flex: 1;
+      background: rgba(20, 25, 35, 0.7);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 100px;
+      padding: 0 16px;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      font-size: 15px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
     .icon-btn {
-      width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-      font-size: 20px; color: var(--text); cursor: pointer; transition: transform var(--transition);
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: rgba(20, 25, 35, 0.7);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: #fff;
+      transition: transform 0.2s;
+      flex-shrink: 0;
     }
-    .icon-btn:active { transform: scale(0.9); }
-    .filters-row { display: flex; gap: 12px; margin-top: 16px; align-items: center; }
-    .filter-group {
-      display: flex; background: rgba(10, 15, 25, 0.7); border-radius: 100px; padding: 4px;
-      border: 1px solid var(--glass-border);
+
+    .icon-btn:active {
+      transform: scale(0.92);
     }
+
+    .filters {
+      display: flex;
+      gap: 8px;
+    }
+
     .filter-btn {
-      padding: 8px 16px; border-radius: 100px; font-size: 13px; font-weight: 600;
-      color: var(--text-secondary); background: transparent; border: none;
-      display: flex; align-items: center; gap: 6px; cursor: pointer; transition: var(--transition);
+      padding: 8px 16px;
+      border-radius: 100px;
+      background: rgba(10, 15, 25, 0.7);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      font-size: 13px;
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.6);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: 0.2s;
     }
-    .filter-btn.active { background: rgba(255,255,255,0.1); color: var(--text); box-shadow: 0 2px 10px rgba(0,0,0,0.2); }
-    .dot { width: 8px; height: 8px; border-radius: 50%; }
-    .dot.blue { background: var(--primary); box-shadow: 0 0 8px var(--primary); }
-    .dot.red { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
 
-    .bottom-sheet {
-      border-radius: var(--radius-lg); padding: 20px; margin-bottom: 24px;
-      animation: slideUp 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+    .filter-btn.active {
+      background: rgba(255, 255, 255, 0.12);
+      color: white;
     }
-    @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-    .sheet-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 20px; }
-    .sheet-col { display: flex; flex-direction: column; gap: 4px; }
-    .sheet-col span { font-size: 11px; color: var(--text-secondary); }
-    .sheet-col h3 { font-size: 18px; font-weight: 600; }
-    .badge {
-      display: inline-flex; align-items: center; gap: 6px;
-      background: rgba(26, 95, 255, 0.15); color: #5C8DFF; padding: 4px 8px;
-      border-radius: 8px; font-size: 12px; font-weight: 600; width: fit-content; margin-top: 4px;
-    }
-    .btn-primary {
-      width: 100%; height: 50px; border-radius: var(--radius-sm);
-      background: rgba(26, 95, 255, 0.1); border: 1px solid rgba(26, 95, 255, 0.3);
-      color: #5C8DFF; font-size: 16px; font-weight: 600;
-      display: flex; align-items: center; justify-content: center; gap: 8px;
-      cursor: pointer; transition: var(--transition);
-    }
-    .btn-primary:active { transform: scale(0.97); background: rgba(26, 95, 255, 0.2); }
 
-    .bottom-nav {
-      display: flex; justify-content: space-between; padding: 0 24px;
-      padding-bottom: env(safe-area-inset-bottom, 12px);
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
     }
+
+    .dot.blue {
+      background: #1A5FFF;
+      box-shadow: 0 0 8px #1A5FFF;
+    }
+
+    .dot.red {
+      background: #FF2A4D;
+      box-shadow: 0 0 8px #FF2A4D;
+    }
+
+    .bottom-card {
+      background: rgba(20, 25, 35, 0.7);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 28px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      margin-bottom: 8px;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 12px;
+    }
+
+    .col span {
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.5);
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .col h3 {
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .btn-route {
+      width: 100%;
+      height: 48px;
+      border-radius: 16px;
+      background: rgba(26, 95, 255, 0.15);
+      border: 1px solid rgba(26, 95, 255, 0.3);
+      color: #5C8DFF;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .nav {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 16px;
+      background: rgba(20, 25, 35, 0.7);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 100px;
+    }
+
     .nav-item {
-      display: flex; flex-direction: column; align-items: center; gap: 4px;
-      color: var(--text-secondary); font-size: 10px; cursor: pointer; transition: var(--transition);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      font-size: 10px;
+      color: rgba(255, 255, 255, 0.5);
+      cursor: pointer;
+      transition: 0.2s;
     }
-    .nav-item svg { width: 24px; height: 24px; fill: currentColor; opacity: 0.7; }
-    .nav-item.active { color: var(--primary); }
-    .nav-item.active svg { opacity: 1; filter: drop-shadow(0 0 8px rgba(26,95,255,0.5)); }
 
-    .glow-marker { position: relative; width: 40px; height: 40px; display: flex; justify-content: center; align-items: center; }
-    .glow-marker .shield {
-      width: 28px; height: 32px; background: #0B0E14; border: 2px solid;
-      border-radius: 6px; display: flex; justify-content: center; align-items: center;
-      position: relative; z-index: 2;
+    .nav-item.active {
+      color: #1A5FFF;
     }
-    .glow-marker .shield svg { width: 16px; height: 16px; fill: white; }
-    .pulse-ring {
-      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-      width: 60px; height: 60px; border-radius: 50%; border: 1px solid; opacity: 0;
-    }
-    .glow-marker.blue .shield { border-color: var(--primary); box-shadow: 0 0 15px var(--primary), inset 0 0 10px rgba(26,95,255,0.5); }
-    .glow-marker.blue .pulse-ring { border-color: var(--primary); box-shadow: 0 0 20px var(--primary); animation: pulseAnim 2s infinite; }
-    .glow-marker.red .shield { border-color: var(--danger); box-shadow: 0 0 15px var(--danger), inset 0 0 10px rgba(255,42,77,0.5); }
-    .glow-marker.red .pulse-ring { border-color: var(--danger); box-shadow: 0 0 20px var(--danger); animation: pulseAnim 2s infinite 0.5s; }
-    @keyframes pulseAnim { 0% { width: 30px; height: 30px; opacity: 1; border-width: 2px; } 100% { width: 120px; height: 120px; opacity: 0; border-width: 0px; } }
-    .user-marker { width: 16px; height: 16px; background: white; border-radius: 50%; box-shadow: 0 0 15px white; border: 4px solid var(--primary); }
 
-    .toast-container { position:fixed; top:80px; right:16px; z-index:200; display:flex; flex-direction:column; gap:8px; pointer-events:none; }
-    .toast { background:var(--glass-bg); backdrop-filter:var(--blur); border:1px solid var(--glass-border); padding:12px 20px; border-radius:12px; color:white; animation: slideRight 0.3s; font-size:14px; }
-    @keyframes slideRight { from {transform:translateX(100%); opacity:0;} to {transform:translateX(0); opacity:1;} }
+    .nav-item svg {
+      width: 24px;
+      height: 24px;
+      fill: currentColor;
+      opacity: 0.7;
+      margin-bottom: 2px;
+    }
+
+    .nav-item.active svg {
+      opacity: 1;
+      filter: drop-shadow(0 0 6px #1A5FFF);
+    }
+
+    /* Маркеры */
+    .glow-marker {
+      width: 40px;
+      height: 40px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .shield {
+      width: 28px;
+      height: 32px;
+      background: #0B0E14;
+      border: 2px solid;
+      border-radius: 6px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .glow-marker.blue .shield {
+      border-color: #1A5FFF;
+      box-shadow: 0 0 15px #1A5FFF, inset 0 0 10px rgba(26, 95, 255, 0.5);
+    }
+
+    .glow-marker.red .shield {
+      border-color: #FF2A4D;
+      box-shadow: 0 0 15px #FF2A4D, inset 0 0 10px rgba(255, 42, 77, 0.5);
+    }
+
+    .user-marker {
+      width: 16px;
+      height: 16px;
+      background: white;
+      border-radius: 50%;
+      box-shadow: 0 0 15px white;
+      border: 4px solid #1A5FFF;
+    }
+
+    .toast-container {
+      position: fixed;
+      top: 80px;
+      right: 16px;
+      z-index: 3000;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .toast {
+      background: rgba(20, 25, 35, 0.9);
+      backdrop-filter: blur(20px);
+      padding: 10px 16px;
+      border-radius: 12px;
+      color: white;
+      font-size: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
 
     .modal-overlay {
-      position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.7);
-      z-index:300; display: flex; align-items: center; justify-content: center;
-      backdrop-filter: blur(4px); pointer-events: auto;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(4px);
+      z-index: 2000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
-    .modal { background: var(--glass-bg); backdrop-filter: var(--blur); border:1px solid var(--glass-border); border-radius: 24px; padding: 24px; width: 90%; max-width: 360px; color: white; }
-    .modal h3 { margin-bottom: 16px; }
-    .modal select, .modal input, .modal textarea { width:100%; background: rgba(255,255,255,0.1); border:1px solid var(--glass-border); border-radius: 12px; padding: 10px; color:white; margin-bottom: 12px; }
-    .modal button { width:100%; height: 44px; border-radius: 12px; border: none; font-weight: 600; cursor: pointer; margin-top: 8px; }
-    .modal .submit-btn { background: var(--primary); color: white; }
-    .modal .cancel-btn { background: rgba(255,255,255,0.1); color: white; }
+
+    .modal {
+      background: rgba(20, 25, 35, 0.9);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 24px;
+      padding: 24px;
+      width: 90%;
+      max-width: 360px;
+      color: white;
+    }
+
+    .modal h3 {
+      margin-bottom: 16px;
+    }
+
+    .modal select,
+    .modal input {
+      width: 100%;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 12px;
+      padding: 10px;
+      color: white;
+      margin-bottom: 12px;
+      outline: none;
+    }
+
+    .modal button {
+      width: 100%;
+      height: 44px;
+      border-radius: 12px;
+      border: none;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+
+    .submit-btn {
+      background: #1A5FFF;
+      color: white;
+    }
+
+    .cancel-btn {
+      background: rgba(255, 255, 255, 0.1);
+      color: white;
+    }
   </style>
 </head>
 <body>
-<div id="app">
   <div id="map"></div>
-  <div class="ui-layer">
-    <div class="top-section">
-      <div class="top-bar interactive">
-        <div class="location-pill glass">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1A5FFF" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
-          Местоположение <span id="locStatus">...</span>
+
+  <div class="ui-overlay">
+    <div class="top-panel">
+      <div class="location-bar interactive">
+        <div class="pill">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1A5FFF" stroke-width="2" style="margin-right:8px">
+            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+            <circle cx="12" cy="10" r="3"></circle>
+          </svg>
+          <span id="locStatus">Ожидание геолокации...</span>
         </div>
-        <div class="icon-btn glass" onclick="refreshMap()">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2v6h-6"></path><path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path><path d="M3 22v-6h6"></path><path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path></svg>
+        <div class="icon-btn" onclick="refreshMap()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 2v6h-6"></path><path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path><path d="M3 22v-6h6"></path><path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path>
+          </svg>
         </div>
-        <div class="icon-btn glass" onclick="openAddEventModal()">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        <div class="icon-btn" onclick="openAddEventModal()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
         </div>
       </div>
 
-      <div class="filters-row interactive">
-        <div class="filter-group">
-          <button class="filter-btn active" onclick="filterEvents('all')">Все</button>
-          <button class="filter-btn" onclick="filterEvents('blue')"><div class="dot blue"></div> Синие</button>
-          <button class="filter-btn" onclick="filterEvents('red')"><div class="dot red"></div> Красные</button>
-        </div>
+      <div class="filters interactive">
+        <button class="filter-btn active" onclick="setFilter('all', this)">Все</button>
+        <button class="filter-btn" onclick="setFilter('blue', this)"><span class="dot blue"></span>Синие</button>
+        <button class="filter-btn" onclick="setFilter('red', this)"><span class="dot red"></span>Красные</button>
       </div>
     </div>
 
-    <div class="bottom-section interactive">
-      <div class="bottom-sheet glass" id="nearestCrewCard">
-        <div class="sheet-grid">
-          <div class="sheet-col"><span>Ближайший экипаж</span><h3 id="crewName">—</h3><div class="badge" id="crewBadge">Нет данных</div></div>
-          <div class="sheet-col"><span>Расстояние</span><h3 id="crewDist">—</h3></div>
-          <div class="sheet-col"><span>Обновлено</span><h3 id="crewTime">—</h3></div>
-        </div>
-        <button class="btn-primary" onclick="buildRoute()">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 20l-5.447-2.724A1 1 0 0 1 3 16.382V5.618a1 1 0 0 1 1.447-.894L9 7l6-3 5.447 2.724A1 1 0 0 1 21 7.618v10.764a1 1 0 0 1-1.447.894L15 17l-6 3z"></path></svg>
-          Построить маршрут
-        </button>
+    <div class="bottom-card interactive">
+      <div class="row">
+        <div class="col"><span>Ближайший экипаж</span><h3 id="crewName">—</h3></div>
+        <div class="col"><span>Расстояние</span><h3 id="crewDist">—</h3></div>
+        <div class="col"><span>Обновлено</span><h3 id="crewTime">—</h3></div>
       </div>
-      <div class="bottom-nav">
-        <div class="nav-item active" data-tab="map"><svg viewBox="0 0 24 24"><path d="M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM15 19l-6-2.11V5l6 2.11V19z"/></svg>Карта</div>
-        <div class="nav-item" data-tab="crews"><svg viewBox="0 0 24 24"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.85 7h10.29l1.08 3.11H5.77L6.85 7zM19 17H5v-5h14v5z"/><circle cx="7.5" cy="14.5" r="1.5"/><circle cx="16.5" cy="14.5" r="1.5"/></svg>Экипажи</div>
-        <div class="nav-item" data-tab="favs"><svg viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>Избранное</div>
-        <div class="nav-item" data-tab="info"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>Инфо</div>
+      <button class="btn-route" onclick="buildRoute()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 20l-5.447-2.724A1 1 0 0 1 3 16.382V5.618a1 1 0 0 1 1.447-.894L9 7l6-3 5.447 2.724A1 1 0 0 1 21 7.618v10.764a1 1 0 0 1-1.447.894L15 17l-6 3z"></path>
+        </svg>
+        Построить маршрут
+      </button>
+    </div>
+
+    <div class="nav interactive">
+      <div class="nav-item active" data-tab="map">
+        <svg viewBox="0 0 24 24"><path d="M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM15 19l-6-2.11V5l6 2.11V19z"/></svg>
+        Карта
+      </div>
+      <div class="nav-item" data-tab="crews">
+        <svg viewBox="0 0 24 24"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.85 7h10.29l1.08 3.11H5.77L6.85 7zM19 17H5v-5h14v5z"/></svg>
+        Экипажи
+      </div>
+      <div class="nav-item" data-tab="favs">
+        <svg viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
+        Избранное
+      </div>
+      <div class="nav-item" data-tab="info">
+        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+        Инфо
       </div>
     </div>
   </div>
-</div>
 
-<div class="toast-container" id="toastContainer"></div>
-<div class="modal-overlay" id="addModal" style="display:none;">
-  <div class="modal">
-    <h3>Добавить событие</h3>
-    <select id="eventType"><option value="ДПС">ДПС</option><option value="патруль">Патруль</option><option value="ДТП">ДТП</option><option value="перекрытие">Перекрытие</option></select>
-    <input type="text" id="eventDesc" placeholder="Описание (необязательно)">
-    <button class="submit-btn" onclick="addEvent()">Отправить</button>
-    <button class="cancel-btn" onclick="closeAddEventModal()">Отмена</button>
+  <div class="modal-overlay interactive" id="addModal" style="display:none;">
+    <div class="modal">
+      <h3>Новое событие</h3>
+      <select id="eventType">
+        <option value="ДПС">ДПС</option>
+        <option value="патруль">Патруль</option>
+        <option value="ДТП">ДТП</option>
+        <option value="перекрытие">Перекрытие</option>
+      </select>
+      <input type="text" id="eventDesc" placeholder="Краткое описание">
+      <button class="submit-btn" onclick="addEvent()">Отправить</button>
+      <button class="cancel-btn" onclick="closeAddEventModal()">Отмена</button>
+    </div>
   </div>
-</div>
 
-<script>
-  // На всякий случай ловим любые скрытые ошибки на смартфонах
-  window.onerror = function(msg, url, line) {
-    alert("Ошибка кода: " + msg + "\nСтрока: " + line);
-    return false;
-  };
+  <div class="toast-container" id="toastContainer"></div>
 
-  // ==================== КОНФИГУРАЦИЯ SUPABASE ====================
-  const SUPABASE_URL = 'https://thyoykhhkqzzlkpdkzol.supabase.co';
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRoeW95a2hoa3F6emxrcGRrem9sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIwNDUyMzEsImV4cCI6MjA5NzYyMTIzMX0.GOBGLL0oPuMWEtHzQM771o8H99zFhOgexprO2AczYtk';
-  
-  let supabase = null;
-  // Безопасная сборка объекта
-  if (window.supabase && window.supabase.createClient) {
-    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  }
+  <script>
+    // ========== FIREBASE КОНФИГ ==========
+    const firebaseConfig = {
+      apiKey: "AIzaSyAoMntaBJd9YJd9PzrTao0dvl1sPbFYVMI",
+      authDomain: "project-3797590376463361850.firebaseapp.com",
+      databaseURL: "https://project-3797590376463361850-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "project-3797590376463361850",
+      storageBucket: "project-3797590376463361850.firebasestorage.app",
+      messagingSenderId: "995163864050",
+      appId: "1:995163864050:web:9f98757570e34afff4496b",
+      measurementId: "G-J2T96NRLXE"
+    };
 
-  // ==================== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ====================
-  let mapInstance = null;
-  let userMarker = null;
-  let userLocation = null;
-  let currentFilter = 'all';
-  let eventsLayer = L.layerGroup();
-  let allEvents = [];
-  let nearestCrewData = null;
-
-  const carSvg = `<svg viewBox="0 0 24 24"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.85 7h10.29l1.08 3.11H5.77L6.85 7zM19 17H5v-5h14v5z"/></svg>`;
-
-  function initMap() {
+    // Инициализация Firebase
     try {
-      mapInstance = L.map('map', {
+      firebase.initializeApp(firebaseConfig);
+    } catch (e) {
+      console.error('Firebase init error', e);
+    }
+    const db = firebase.database();
+
+    // ========== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ==========
+    let map, userLocation, userMarker, eventsLayer;
+    let allEvents = [];
+    let currentFilter = 'all';
+    let nearestCrew = null;
+
+    const carSvg = `<svg viewBox="0 0 24 24" width="16" height="16" fill="white"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.85 7h10.29l1.08 3.11H5.77L6.85 7zM19 17H5v-5h14v5z"/></svg>`;
+
+    // ========== КАРТА ==========
+    function initMap() {
+      map = L.map('map', {
         zoomControl: false,
         attributionControl: false
       }).setView([53.2007, 45.0046], 12);
 
       L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
         maxZoom: 19
-      }).addTo(mapInstance);
+      }).addTo(map);
 
-      eventsLayer = L.layerGroup().addTo(mapInstance);
-      
-      loadEventsFromDB();
+      eventsLayer = L.layerGroup().addTo(map);
+
+      // Подписка на Firebase в реальном времени
+      db.ref('events').on('value', (snapshot) => {
+        const data = snapshot.val();
+        allEvents = data ? Object.entries(data).map(([id, val]) => ({ id, ...val })) : [];
+        renderMarkers();
+      }, (error) => {
+        console.error('Firebase read error:', error);
+        showToast('Ошибка загрузки событий');
+      });
+
       locateUser();
-    } catch(err) {
-      alert("Ошибка Leaflet: " + err.message);
-    }
-  }
-
-  async function loadEventsFromDB() {
-    if (!supabase) {
-      showToast('БД не подключена. Режим демо.');
-      loadDemoData();
-      return;
-    }
-    try {
-      const { data, error } = await supabase.from('events').select('*').order('created_at', { ascending: false });
-      if (error) throw error;
-      allEvents = data || [];
-      applyFilterAndRender();
-      showToast(`Загружено ${allEvents.length} событий`);
-    } catch (e) {
-      console.error('Ошибка загрузки событий:', e);
-      showToast('Используются демо-данные');
-      loadDemoData();
-    }
-  }
-
-  async function addEventToDB(lat, lng, type, description) {
-    if (!supabase) {
-      showToast('Добавление заблокировано в демо-режиме');
-      return;
-    }
-    try {
-      const { data, error } = await supabase.from('events').insert([
-        { latitude: lat, longitude: lng, type: type, description: description }
-      ]);
-      if (error) throw error;
-      showToast('Событие добавлено');
-      loadEventsFromDB();
-    } catch (e) {
-      console.error('Ошибка добавления:', e);
-      showToast('Не удалось добавить событие');
-    }
-  }
-
-  function loadDemoData() {
-    const demoPoints = [
-      { latitude: 53.2207, longitude: 44.9746, type: 'ДПС', description: 'Стоят у кольца' },
-      { latitude: 53.2007, longitude: 45.0046, type: 'ДПС', description: 'Проверка документов' },
-      { latitude: 53.1807, longitude: 44.9846, type: 'патруль', description: 'Медленно едут' },
-      { latitude: 53.1907, longitude: 44.9546, type: 'ДТП', description: 'Занят правый ряд' },
-      { latitude: 53.2107, longitude: 45.0346, type: 'перекрытие', description: 'Ремонт дороги' }
-    ];
-    allEvents = demoPoints;
-    applyFilterAndRender();
-  }
-
-  function createGlowMarker(type) {
-    const colorClass = (type === 'ДПС' || type === 'патруль') ? 'blue' : 'red';
-    const html = `<div class="glow-marker ${colorClass}"><div class="shield">${carSvg}</div><div class="pulse-ring"></div><div class="pulse-ring" style="animation-delay: 1s;"></div></div>`;
-    return L.divIcon({ className: '', html: html, iconSize: [40, 40] });
-  }
-
-  function applyFilterAndRender() {
-    eventsLayer.clearLayers();
-    let filtered = allEvents;
-    if (currentFilter === 'blue') {
-      filtered = allEvents.filter(e => e.type === 'ДПС' || e.type === 'патруль');
-    } else if (currentFilter === 'red') {
-      filtered = allEvents.filter(e => e.type === 'ДТП' || e.type === 'перекрытие');
     }
 
-    filtered.forEach(event => {
-      if(event.latitude && event.longitude) {
-        L.marker([event.latitude, event.longitude], { icon: createGlowMarker(event.type) })
-          .addTo(eventsLayer)
-          .bindPopup(`<b>${event.type}</b><br>${event.description || ''}`);
-      }
-    });
-
-    updateNearestCrew();
-  }
-
-  function filterEvents(type) {
-    currentFilter = type;
-    document.querySelectorAll('.filter-btn').forEach(btn => {
-      btn.classList.remove('active');
-      const onclickAttr = btn.getAttribute('onclick');
-      if (onclickAttr && onclickAttr.includes(`'${type}'`)) {
-        btn.classList.add('active');
-      }
-    });
-    applyFilterAndRender();
-  }
-
-  function locateUser() {
-    if (!navigator.geolocation) {
-      document.getElementById('locStatus').textContent = 'недоступно';
-      return;
+    // ========== МАРКЕРЫ ==========
+    function createIcon(type) {
+      const colorClass = (type === 'ДПС' || type === 'патруль') ? 'blue' : 'red';
+      return L.divIcon({
+        html: `<div class="glow-marker ${colorClass}"><div class="shield">${carSvg}</div></div>`,
+        iconSize: [40, 40],
+        className: ''
+      });
     }
-    document.getElementById('locStatus').textContent = 'поиск...';
-    
-    navigator.geolocation.watchPosition(
-      (pos) => {
-        userLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        document.getElementById('locStatus').textContent = 'определено';
-        
-        if (!userMarker) {
-          userMarker = L.marker([userLocation.lat, userLocation.lng], {
-            icon: L.divIcon({ className: '', html: '<div class="user-marker"></div>', iconSize: [16,16] })
-          }).addTo(mapInstance);
-        } else {
-          userMarker.setLatLng([userLocation.lat, userLocation.lng]);
+
+    function renderMarkers() {
+      if (!eventsLayer) return;
+      eventsLayer.clearLayers();
+
+      const filtered = allEvents.filter(e => {
+        if (currentFilter === 'blue') return e.type === 'ДПС' || e.type === 'патруль';
+        if (currentFilter === 'red') return e.type === 'ДТП' || e.type === 'перекрытие';
+        return true;
+      });
+
+      filtered.forEach(e => {
+        if (e.latitude && e.longitude) {
+          L.marker([e.latitude, e.longitude], { icon: createIcon(e.type) })
+            .addTo(eventsLayer)
+            .bindPopup(`<b>${e.type}</b><br>${e.description || ''}`);
         }
-        
-        if (!mapInstance._initialCentered) {
-          mapInstance.setView([userLocation.lat, userLocation.lng], 13);
-          mapInstance._initialCentered = true;
-        }
-        
-        updateNearestCrew();
-      },
-      (err) => {
-        document.getElementById('locStatus').textContent = 'отклонено';
-        console.warn('Geolocation error:', err);
-      },
-      { enableHighAccuracy: true, maximumAge: 30000, timeout: 10000 }
-    );
-  }
+      });
 
-  function haversineDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371;
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat/2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) ** 2;
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  }
-
-  function updateNearestCrew() {
-    if (!userLocation) {
-      document.getElementById('crewName').textContent = '—';
-      document.getElementById('crewDist').textContent = '—';
-      document.getElementById('crewTime').textContent = '—';
-      document.getElementById('crewBadge').textContent = 'Нет данных';
-      return;
+      updateNearestCrew();
     }
 
-    const crews = allEvents.filter(e => e.type === 'ДПС' || e.type === 'патруль');
-    let nearest = null;
-    let minDist = Infinity;
-
-    crews.forEach(crew => {
-      const dist = haversineDistance(userLocation.lat, userLocation.lng, crew.latitude, crew.longitude);
-      if (dist < minDist) {
-        minDist = dist;
-        nearest = crew;
+    // ========== ГЕОЛОКАЦИЯ ==========
+    function locateUser() {
+      if (!navigator.geolocation) {
+        document.getElementById('locStatus').textContent = 'Геолокация недоступна';
+        return;
       }
-    });
 
-    if (nearest) {
-      nearestCrewData = nearest;
+      navigator.geolocation.watchPosition(
+        pos => {
+          userLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+          document.getElementById('locStatus').textContent = 'Местоположение определено';
+
+          if (!userMarker) {
+            userMarker = L.marker([userLocation.lat, userLocation.lng], {
+              icon: L.divIcon({
+                html: '<div class="user-marker"></div>',
+                iconSize: [16, 16],
+                className: ''
+              })
+            }).addTo(map);
+          } else {
+            userMarker.setLatLng([userLocation.lat, userLocation.lng]);
+          }
+
+          if (!map._centered) {
+            map.setView([userLocation.lat, userLocation.lng], 13);
+            map._centered = true;
+          }
+
+          updateNearestCrew();
+        },
+        err => {
+          document.getElementById('locStatus').textContent = 'Нет доступа к геопозиции';
+          console.warn(err);
+        },
+        { enableHighAccuracy: true, maximumAge: 30000, timeout: 10000 }
+      );
+    }
+
+    // ========== БЛИЖАЙШИЙ ЭКИПАЖ ==========
+    function updateNearestCrew() {
+      if (!userLocation) return;
+
+      const crews = allEvents.filter(e => e.type === 'ДПС' || e.type === 'патруль');
+      if (crews.length === 0) {
+        document.getElementById('crewName').textContent = '—';
+        document.getElementById('crewDist').textContent = '—';
+        document.getElementById('crewTime').textContent = '—';
+        nearestCrew = null;
+        return;
+      }
+
+      let minDist = Infinity, nearest = null;
+      crews.forEach(c => {
+        const d = haversine(userLocation.lat, userLocation.lng, c.latitude, c.longitude);
+        if (d < minDist) { minDist = d; nearest = c; }
+      });
+
+      nearestCrew = nearest;
       document.getElementById('crewName').textContent = nearest.type;
       document.getElementById('crewDist').textContent = minDist.toFixed(1) + ' км';
-      document.getElementById('crewBadge').textContent = 'Экипаж';
-      document.getElementById('crewTime').textContent = 'только что';
-    } else {
-      nearestCrewData = null;
-      document.getElementById('crewName').textContent = '—';
-      document.getElementById('crewDist').textContent = '—';
-      document.getElementById('crewBadge').textContent = 'Нет поблизости';
+      document.getElementById('crewTime').textContent = 'Сейчас';
     }
-  }
 
-  function buildRoute() {
-    if (!nearestCrewData) {
-      showToast('Нет данных для построения маршрута');
-      return;
+    function haversine(lat1, lon1, lat2, lon2) {
+      const R = 6371;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
-    const { latitude, longitude } = nearestCrewData;
-    window.open(`https://yandex.ru/maps/?rtext=~${latitude},${longitude}`, '_blank');
-  }
 
-  function openAddEventModal() {
-    document.getElementById('addModal').style.display = 'flex';
-  }
-  function closeAddEventModal() {
-    document.getElementById('addModal').style.display = 'none';
-  }
-  async function addEvent() {
-    const type = document.getElementById('eventType').value;
-    const desc = document.getElementById('eventDesc').value;
-    if (!userLocation) {
-      showToast('Сначала определите местоположение');
-      return;
-    }
-    await addEventToDB(userLocation.lat, userLocation.lng, type, desc);
-    closeAddEventModal();
-  }
-
-  document.querySelectorAll('.nav-item').forEach(item => {
-    item.addEventListener('click', (e) => {
-      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-      item.classList.add('active');
-      const tab = item.dataset.tab;
-      
-      if (tab === 'map') {
-        filterEvents('all');
-      } else if (tab === 'crews') {
-        filterEvents('blue');
-        showToast('Показаны только экипажи');
-      } else if (tab === 'favs') {
-        showToast('Избранное пусто');
-      } else if (tab === 'info') {
-        showToast('RoadAlert v1.1 | Стабильная сборка');
+    function buildRoute() {
+      if (!nearestCrew) {
+        showToast('Нет данных для маршрута');
+        return;
       }
-    });
-  });
-
-  function refreshMap() {
-    showToast('Обновление...');
-    loadEventsFromDB();
-    if (userLocation && mapInstance) {
-      mapInstance.setView([userLocation.lat, userLocation.lng], mapInstance.getZoom());
+      window.open(`https://yandex.ru/maps/?rtext=~${nearestCrew.latitude},${nearestCrew.longitude}`, '_blank');
     }
-  }
 
-  function showToast(msg) {
-    const toast = document.createElement('div');
-    toast.className = 'toast';
-    toast.textContent = msg;
-    document.getElementById('toastContainer').appendChild(toast);
-    setTimeout(() => toast.remove(), 3000);
-  }
+    // ========== ФИЛЬТРЫ (исправлено) ==========
+    function setFilter(type, btn) {
+      currentFilter = type;
+      // Обновляем активную кнопку фильтра
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      // Перерисовываем маркеры
+      renderMarkers();
 
-  window.addEventListener('DOMContentLoaded', initMap);
-</script>
+      // Синхронизируем активность в нижней навигации (если нужно)
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+      const activeNav = document.querySelector(`.nav-item[data-tab="${type === 'all' ? 'map' : type === 'blue' ? 'crews' : 'map'}"]`);
+      if (activeNav) activeNav.classList.add('active');
+    }
+
+    // ========== МОДАЛЬНОЕ ОКНО ==========
+    function openAddEventModal() {
+      document.getElementById('addModal').style.display = 'flex';
+    }
+
+    function closeAddEventModal() {
+      document.getElementById('addModal').style.display = 'none';
+      document.getElementById('eventDesc').value = '';
+    }
+
+    async function addEvent() {
+      if (!userLocation) {
+        showToast('Сначала определите местоположение');
+        return;
+      }
+      const type = document.getElementById('eventType').value;
+      const desc = document.getElementById('eventDesc').value.trim();
+      try {
+        await db.ref('events').push({
+          latitude: userLocation.lat,
+          longitude: userLocation.lng,
+          type: type,
+          description: desc || '',
+          timestamp: Date.now()
+        });
+        showToast('Событие добавлено');
+        closeAddEventModal();
+      } catch (e) {
+        showToast('Ошибка добавления');
+        console.error(e);
+      }
+    }
+
+    // ========== НАВИГАЦИЯ (исправлено) ==========
+    document.querySelectorAll('.nav-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const tab = item.dataset.tab;
+        // Убираем активность со всех nav-элементов
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+        item.classList.add('active');
+
+        // Применяем соответствующий фильтр
+        if (tab === 'crews') {
+          setFilter('blue', document.querySelector('.filter-btn[onclick*="blue"]'));
+        } else if (tab === 'map') {
+          setFilter('all', document.querySelector('.filter-btn[onclick*="all"]'));
+        } else if (tab === 'favs') {
+          showToast('Избранное — в разработке');
+        } else if (tab === 'info') {
+          showToast('RoadAlert • Firebase • Реальное время');
+        }
+      });
+    });
+
+    function refreshMap() {
+      showToast('Данные обновляются автоматически');
+    }
+
+    // ========== УВЕДОМЛЕНИЯ ==========
+    function showToast(msg) {
+      const toast = document.createElement('div');
+      toast.className = 'toast';
+      toast.textContent = msg;
+      document.getElementById('toastContainer').appendChild(toast);
+      setTimeout(() => toast.remove(), 3000);
+    }
+
+    // ========== СТАРТ ==========
+    window.addEventListener('DOMContentLoaded', initMap);
+  </script>
 </body>
 </html>
