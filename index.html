@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>RoadAlert</title>
-  <meta name="author" content="E DEV">
+  <title>RoadAlert | EGORKIN DEV</title>
+  <meta name="author" content="EGORKIN DEV">
   <meta name="theme-color" content="#0B0C10">
   <meta name="description" content="Сообщество дорожных событий">
   <link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22RoadAlert%22%2C%22short_name%22%3A%22RoadAlert%22%2C%22start_url%22%3A%22.%2F%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%230B0C10%22%2C%22theme_color%22%3A%22%231A5FFF%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%20100%20100'%3E%3Ccircle%20cx%3D'50'%20cy%3D'50'%20r%3D'45'%20fill%3D'%231A5FFF'%2F%3E%3C%2Fsvg%3E%22%2C%22sizes%22%3A%22100x100%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%7D%5D%7D">
   
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
@@ -203,11 +203,21 @@
 </div>
 
 <script>
+  // На всякий случай ловим любые скрытые ошибки на смартфонах
+  window.onerror = function(msg, url, line) {
+    alert("Ошибка кода: " + msg + "\nСтрока: " + line);
+    return false;
+  };
+
   // ==================== КОНФИГУРАЦИЯ SUPABASE ====================
   const SUPABASE_URL = 'https://thyoykhhkqzzlkpdkzol.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRoeW95a2hoa3F6emxrcGRrem9sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIwNDUyMzEsImV4cCI6MjA5NzYyMTIzMX0.GOBGLL0oPuMWEtHzQM771o8H99zFhOgexprO2AczYtk';
   
-  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  let supabase = null;
+  // Безопасная сборка объекта
+  if (window.supabase && window.supabase.createClient) {
+    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  }
 
   // ==================== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ====================
   let mapInstance = null;
@@ -221,22 +231,31 @@
   const carSvg = `<svg viewBox="0 0 24 24"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.85 7h10.29l1.08 3.11H5.77L6.85 7zM19 17H5v-5h14v5z"/></svg>`;
 
   function initMap() {
-    mapInstance = L.map('map', {
-      zoomControl: false,
-      attributionControl: false
-    }).setView([53.2007, 45.0046], 12);
+    try {
+      mapInstance = L.map('map', {
+        zoomControl: false,
+        attributionControl: false
+      }).setView([53.2007, 45.0046], 12);
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      maxZoom: 19
-    }).addTo(mapInstance);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        maxZoom: 19
+      }).addTo(mapInstance);
 
-    eventsLayer = L.layerGroup().addTo(mapInstance);
-    
-    loadEventsFromDB();
-    locateUser();
+      eventsLayer = L.layerGroup().addTo(mapInstance);
+      
+      loadEventsFromDB();
+      locateUser();
+    } catch(err) {
+      alert("Ошибка Leaflet: " + err.message);
+    }
   }
 
   async function loadEventsFromDB() {
+    if (!supabase) {
+      showToast('БД не подключена. Режим демо.');
+      loadDemoData();
+      return;
+    }
     try {
       const { data, error } = await supabase.from('events').select('*').order('created_at', { ascending: false });
       if (error) throw error;
@@ -245,14 +264,16 @@
       showToast(`Загружено ${allEvents.length} событий`);
     } catch (e) {
       console.error('Ошибка загрузки событий:', e);
-      showToast('Ошибка загрузки данных');
-      if (allEvents.length === 0) {
-        loadDemoData();
-      }
+      showToast('Используются демо-данные');
+      loadDemoData();
     }
   }
 
   async function addEventToDB(lat, lng, type, description) {
+    if (!supabase) {
+      showToast('Добавление заблокировано в демо-режиме');
+      return;
+    }
     try {
       const { data, error } = await supabase.from('events').insert([
         { latitude: lat, longitude: lng, type: type, description: description }
@@ -268,15 +289,14 @@
 
   function loadDemoData() {
     const demoPoints = [
-      { lat: 53.2207, lng: 44.9746, type: 'ДПС' },
-      { lat: 53.2007, lng: 45.0046, type: 'ДПС' },
-      { lat: 53.1807, lng: 44.9846, type: 'патруль' },
-      { lat: 53.1907, lng: 44.9546, type: 'ДТП' },
-      { lat: 53.2107, lng: 45.0346, type: 'перекрытие' }
+      { latitude: 53.2207, longitude: 44.9746, type: 'ДПС', description: 'Стоят у кольца' },
+      { latitude: 53.2007, longitude: 45.0046, type: 'ДПС', description: 'Проверка документов' },
+      { latitude: 53.1807, longitude: 44.9846, type: 'патруль', description: 'Медленно едут' },
+      { latitude: 53.1907, longitude: 44.9546, type: 'ДТП', description: 'Занят правый ряд' },
+      { latitude: 53.2107, longitude: 45.0346, type: 'перекрытие', description: 'Ремонт дороги' }
     ];
-    allEvents = demoPoints.map(p => ({ ...p, id: 'demo', description: '' }));
+    allEvents = demoPoints;
     applyFilterAndRender();
-    showToast('Демо-данные (подключите Supabase)');
   }
 
   function createGlowMarker(type) {
@@ -295,9 +315,11 @@
     }
 
     filtered.forEach(event => {
-      L.marker([event.latitude, event.longitude], { icon: createGlowMarker(event.type) })
-        .addTo(eventsLayer)
-        .bindPopup(`<b>${event.type}</b><br>${event.description || ''}`);
+      if(event.latitude && event.longitude) {
+        L.marker([event.latitude, event.longitude], { icon: createGlowMarker(event.type) })
+          .addTo(eventsLayer)
+          .bindPopup(`<b>${event.type}</b><br>${event.description || ''}`);
+      }
     });
 
     updateNearestCrew();
@@ -307,7 +329,8 @@
     currentFilter = type;
     document.querySelectorAll('.filter-btn').forEach(btn => {
       btn.classList.remove('active');
-      if (btn.getAttribute('onclick').includes(`'${type}'`)) {
+      const onclickAttr = btn.getAttribute('onclick');
+      if (onclickAttr && onclickAttr.includes(`'${type}'`)) {
         btn.classList.add('active');
       }
     });
@@ -342,7 +365,7 @@
         updateNearestCrew();
       },
       (err) => {
-        document.getElementById('locStatus').textContent = 'ошибка';
+        document.getElementById('locStatus').textContent = 'отклонено';
         console.warn('Geolocation error:', err);
       },
       { enableHighAccuracy: true, maximumAge: 30000, timeout: 10000 }
@@ -382,7 +405,7 @@
       nearestCrewData = nearest;
       document.getElementById('crewName').textContent = nearest.type;
       document.getElementById('crewDist').textContent = minDist.toFixed(1) + ' км';
-      document.getElementById('crewBadge').textContent = nearest.description ? `№${nearest.id}` : 'Экипаж';
+      document.getElementById('crewBadge').textContent = 'Экипаж';
       document.getElementById('crewTime').textContent = 'только что';
     } else {
       nearestCrewData = null;
@@ -430,14 +453,9 @@
         filterEvents('blue');
         showToast('Показаны только экипажи');
       } else if (tab === 'favs') {
-        const favs = JSON.parse(localStorage.getItem('roadAlertFavs') || '[]');
-        if (favs.length === 0) {
-          showToast('Избранное пусто');
-        } else {
-          showToast(`В избранном ${favs.length} событий`);
-        }
+        showToast('Избранное пусто');
       } else if (tab === 'info') {
-        showToast('RoadAlert v1.0 | EGORKIN DEV | Supabase + Leaflet');
+        showToast('RoadAlert v1.1 | Стабильная сборка');
       }
     });
   });
@@ -445,7 +463,7 @@
   function refreshMap() {
     showToast('Обновление...');
     loadEventsFromDB();
-    if (userLocation) {
+    if (userLocation && mapInstance) {
       mapInstance.setView([userLocation.lat, userLocation.lng], mapInstance.getZoom());
     }
   }
