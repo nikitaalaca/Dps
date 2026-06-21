@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>RoadAlert | EGORKIN DEV</title>
-  <meta name="author" content="EGORKIN DEV">
+  <title>RoadAlert</title>
+  <meta name="author" content="E DEV">
   <meta name="theme-color" content="#0B0C10">
   <meta name="description" content="Сообщество дорожных событий">
   <link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22RoadAlert%22%2C%22short_name%22%3A%22RoadAlert%22%2C%22start_url%22%3A%22.%2F%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%230B0C10%22%2C%22theme_color%22%3A%22%231A5FFF%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%20100%20100'%3E%3Ccircle%20cx%3D'50'%20cy%3D'50'%20r%3D'45'%20fill%3D'%231A5FFF'%2F%3E%3C%2Fsvg%3E%22%2C%22sizes%22%3A%22100x100%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%7D%5D%7D">
@@ -305,8 +305,12 @@
 
   function filterEvents(type) {
     currentFilter = type;
-    document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
-    event.currentTarget.classList.add('active');
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+      btn.classList.remove('active');
+      if (btn.getAttribute('onclick').includes(`'${type}'`)) {
+        btn.classList.add('active');
+      }
+    });
     applyFilterAndRender();
   }
 
@@ -394,7 +398,7 @@
       return;
     }
     const { latitude, longitude } = nearestCrewData;
-    window.open(`https://maps.google.com/maps?daddr=${latitude},${longitude}`, '_blank');
+    window.open(`https://yandex.ru/maps/?rtext=~${latitude},${longitude}`, '_blank');
   }
 
   function openAddEventModal() {
@@ -419,8 +423,9 @@
       document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
       item.classList.add('active');
       const tab = item.dataset.tab;
+      
       if (tab === 'map') {
-        // уже на карте
+        filterEvents('all');
       } else if (tab === 'crews') {
         filterEvents('blue');
         showToast('Показаны только экипажи');
